@@ -1,0 +1,53 @@
+<script>
+    const socket = io();
+    let timerInterval;
+    let questionNumber, totalQuestions;
+
+    // Fetch question data
+    fetch('/question-data')
+        .then(response => response.json())
+        .then(data => {
+            questionNumber = data.question_number;
+            totalQuestions = data.total_questions;
+            document.getElementById('questionNumber').textContent = questionNumber;
+            document.getElementById('totalQuestions').textContent = totalQuestions;
+            document.getElementById('question').textContent = data.question;
+            updateProgress();
+            startAnswering();
+        });
+
+    function startAnswering() {
+        socket.emit('start_recording');
+        startTimer();
+    }
+
+    function startTimer() {
+        let timeLeft = 45;
+        const timerElement = document.getElementById('timer');
+        timerElement.textContent = timeLeft;
+        timerInterval = setInterval(() => {
+            timeLeft--;
+            timerElement.textContent = timeLeft;
+            if (timeLeft <= 0) {
+                clearInterval(timerInterval);
+            }
+        }, 1000);
+    }
+
+    socket.on('answer_evaluation', data => {
+        document.getElementById('answer').innerHTML = '<h3>Your Answer:</h3><p>' + data.transcription + '</p>';
+        document.getElementById('evaluation').innerHTML = '<h3>Evaluation:</h3><p>' + data.evaluation + '</p>';
+        document.getElementById('nextQuestionBtn').style.display = 'inline-block';
+        clearInterval(timerInterval);
+    });
+
+    function updateProgress() {
+        const progress = (questionNumber / totalQuestions) * 100;
+        document.getElementById('progress').style.width = `${progress}%`;
+        document.getElementById('progress').textContent = `${Math.round(progress)}%`;
+    }
+
+    document.getElementById('nextQuestionBtn').addEventListener('click', () => {
+        window.location.href = `/question/${questionNumber}`;
+    });
+</script>

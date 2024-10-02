@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Honest Hire AI Interview Platform</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Major+Mono+Display&family=Share+Tech+Mono&display=swap');
+
+        :root {
+            --neon-blue: #00ffff;
+            --neon-pink: #ff00ff;
+            --neon-green: #39ff14;
+            --deep-black: #000000;
+        }
+
+        body {
+            font-family: 'Share Tech Mono', monospace;
+            background-color: var(--deep-black);
+            color: var(--neon-blue);
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+            background-image: 
+                repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0, 255, 255, 0.03) 2px, rgba(0, 255, 255, 0.03) 4px),
+                repeating-linear-gradient(90deg, transparent, transparent 2px, rgba(255, 0, 255, 0.03) 2px, rgba(255, 0, 255, 0.03) 4px);
+        }
+
+        .header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 30px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .logo-placeholder {
+            width: 100px;
+            height: 100px;
+            background: linear-gradient(45deg, var(--neon-blue), var(--neon-pink));
+            clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Major Mono Display', monospace;
+            color: var(--deep-black);
+            font-size: 1em;
+            text-transform: uppercase;
+            animation: glitchLogo 2s infinite alternate;
+        }
+
+        @keyframes glitchLogo {
+            0%, 100% { clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%); }
+            25% { clip-path: polygon(50% 0%, 100% 20%, 100% 80%, 50% 100%, 0% 80%, 0% 20%); }
+            50% { clip-path: polygon(55% 5%, 100% 30%, 100% 70%, 55% 95%, 5% 70%, 5% 30%); }
+            75% { clip-path: polygon(45% 5%, 95% 30%, 95% 70%, 45% 95%, 5% 70%, 5% 30%); }
+        }
+
+        h1 {
+            font-family: 'Major Mono Display', monospace;
+            color: var(--neon-blue);
+            font-size: 2.2em;
+            text-transform: uppercase;
+            letter-spacing: 3px;
+            margin: 0;
+            text-align: center;
+            flex-grow: 1;
+            text-shadow: 
+                0 0 5px var(--neon-blue),
+                0 0 10px var(--neon-blue);
+            animation: crypticText 5s infinite alternate;
+        }
+
+        @keyframes crypticText {
+            0%, 100% { opacity: 1; transform: skew(0deg); }
+            25% { opacity: 0.8; transform: skew(2deg); }
+            75% { opacity: 0.9; transform: skew(-2deg); }
+        }
+
+        #question, #transcription, #evaluation {
+            background-color: rgba(0, 0, 0, 0.8);
+            border: 2px solid var(--neon-blue);
+            border-radius: 0;
+            padding: 15px;
+            margin-top: 20px;
+            box-shadow: 0 0 10px rgba(0, 255, 255, 0.3);
+            position: relative;
+            overflow: hidden;
+        }
+
+        #question::before, #transcription::before, #evaluation::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: 
+                linear-gradient(
+                    transparent 0%,
+                    rgba(0, 255, 255, 0.1) 50%,
+                    transparent 100%
+                );
+            animation: scan 4s linear infinite;
+        }
+
+        @keyframes scan {
+            0% { transform: translateY(-50%); }
+            100% { transform: translateY(50%); }
+        }
+
+        button {
+            font-family: 'Share Tech Mono', monospace;
+            background-color: var(--deep-black);
+            color: var(--neon-blue);
+            padding: 12px 24px;
+            border: 2px solid var(--neon-blue);
+            cursor: pointer;
+            margin-top: 15px;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            font-weight: bold;
+            position: relative;
+            overflow: hidden;
+        }
+
+        button::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(
+                90deg,
+                transparent,
+                rgba(0, 255, 255, 0.4),
+                transparent
+            );
+            transition: 0.5s;
+        }
+
+        button:hover::before {
+            left: 100%;
+        }
+
+        button:hover {
+            background-color: var(--neon-blue);
+            color: var(--deep-black);
+            box-shadow: 0 0 10px var(--neon-blue);
+        }
+
+        #stopButton {
+            border-color: var(--neon-pink);
+            color: var(--neon-pink);
+        }
+
+        #stopButton:hover {
+            background-color: var(--neon-pink);
+            color: var(--deep-black);
+            box-shadow: 0 0 10px var(--neon-pink);
+        }
+
+        #loadingBar {
+            width: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            overflow: hidden;
+            display: none;
+            margin-top: 20px;
+            position: relative;
+        }
+
+        #loadingProgress {
+            width: 0%;
+            height: 30px;
+            background: repeating-linear-gradient(
+                45deg,
+                var(--neon-blue),
+                var(--neon-blue) 10px,
+                var(--neon-pink) 10px,
+                var(--neon-pink) 20px
+            );
+            text-align: center;
+            line-height: 30px;
+            color: var(--deep-black);
+            transition: width 0.5s ease-in-out;
+            font-family: 'Share Tech Mono', monospace;
+            font-weight: bold;
+            position: relative;
+            overflow: hidden;
+        }
+
+        #loadingProgress::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(
+                90deg,
+                transparent,
+                rgba(255, 255, 255, 0.4),
+                transparent
+            );
+            animation: loading 1.5s infinite;
+        }
+
+        @keyframes loading {
+            0% { left: -100%; }
+            100% { left: 100%; }
+        }
+
+        input[type="file"] {
+            border: 2px solid var(--neon-blue);
+            padding: 10px;
+            background-color: var(--deep-black);
+            color: var(--neon-blue);
+            margin-bottom: 10px;
+            font-family: 'Share Tech Mono', monospace;
+        }
+
+        input[type="file"]::file-selector-button {
+            font-family: 'Share Tech Mono', monospace;
+            background-color: var(--deep-black);
+            color: var(--neon-blue);
+            padding: 8px 16px;
+            border: 1px solid var(--neon-blue);
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        input[type="file"]::file-selector-button:hover {
+            background-color: var(--neon-blue);
+            color: var(--deep-black);
+        }
+
+        #evaluation h3 {
+            color: var(--neon-green);
+            font-family: 'Major Mono Display', monospace;
+            margin-bottom: 15px;
+        }
+
+        #evaluation .score {
+            font-size: 1.2em;
+            font-weight: bold;
+            color: var(--neon-pink);
+            margin-bottom: 10px;
+        }
+
+        #evaluation .review, #evaluation .improvement {
+            margin-bottom: 10px;
+        }
+
+        #evaluation .label {
+            font-weight: bold;
+            color: var(--neon-blue);
+        }
+
+        #videoFeed {
+            width: 100%;
+            max-width: 640px;
+            margin: 20px auto;
+            display: block;
+            border: 2px solid var(--neon-blue);
+            box-shadow: 0 0 10px rgba(0, 255, 255, 0.3);
+        }
+
+        #handStatus {
+            text-align: center;
+            margin-top: 10px;
+            font-weight: bold;
+            color: var(--neon-green);
+            text-shadow: 0 0 5px var(--neon-green);
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="logo-placeholder">HH AI</div>
+        <h1>Honest Hire AI Interview Platform</h1>
+    </div>
+    <input type="file" id="resumeUpload" accept=".pdf">
+    <button onclick="uploadResume()">Upload Resume</button>
+    <div id="question"></div>
+    <video id="videoFeed" autoplay muted></video>
+    <div id="handStatus">Hands status: Not detected</div>
+    <button id="stopButton" style="display: none;" onclick="stopRecording()">Stop Recording</button>
+    <div id="loadingBar">
+        <div id="loadingProgress">0%</div>
+    </div>
+    <div id="transcription"></div>
+    <div id="evaluation"></div>
+
+    <script>
+        const socket = io();
+        let mediaRecorder;
+        let audioChunks = [];
+        let isRecording = false;
+        let handDetectionInterval;
+
+        // Set up video feed
+        const video = document.getElementById('videoFeed');
+        navigator.mediaDevices.getUserMedia({ video: true })
+            .then(stream => {
+                video.srcObject = stream;
+            })
+            .catch(err => {
+                console.error("Error accessing the camera:", err);
+            });
+
+        function uploadResume() {
+            const file = document.getElementById('resumeUpload').files[0];
+            if (file) {
+                const formData = new FormData();
+                formData.append('resume', file);
+                fetch('/upload_resume', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        document.getElementById('question').innerHTML = `<h3>AI Generated Question:</h3><p>${data.question}</p>`;
+                        setTimeout(startRecording, 5000);  // Start recording after 5 seconds
+                    } else {
+                        alert('Error: ' + data.error);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('An error occurred. Please try again.');
+                });
+            } else {
+                alert('Please select a PDF file first.');
+            }
+        }
+
+        function startRecording() {
+            navigator.mediaDevices.getUserMedia({ audio: true })
+                .then(stream => {
+                    mediaRecorder = new MediaRecorder(stream);
+                    mediaRecorder.start();
+                    isRecording = true;
+                    document.getElementById('stopButton').style.display = 'block';
+
+                    mediaRecorder.addEventListener("dataavailable", event => {
+                        audioChunks.push(event.data);
+                    });
+
+                    mediaRecorder.addEventListener("stop", () => {
+                        const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                        sendAudioToServer(audioBlob);
+                    });
+
+                    socket.emit('start_recording');
+                    startHandDetection();
+
+                    // Automatically stop recording after 1 minute
+                    setTimeout(stopRecording, 60000);
+                });
+        }
+
+        function stopRecording() {
+            if (isRecording) {
+                mediaRecorder.stop();
+                isRecording = false;
+                document.getElementById('stopButton').style.display = 'none';
+                showLoadingBar();
+                stopHandDetection();
+            }
+        }
+
+        function startHandDetection() {
+            handDetectionInterval = setInterval(() => {
+                const canvas = document.createElement('canvas');
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                canvas.getContext('2d').drawImage(video, 0, 0);
+                canvas.toBlob(blob => {
+                    const reader = new FileReader();
+                    reader.onloadend = () => {
+                        socket.emit('process_frame', { image: reader.result });
+                    };
+                    reader.readAsDataURL(blob);
+                }, 'image/jpeg');
+            }, 1000);  // Send frame every second
+        }
+
+        function stopHandDetection() {
+            clearInterval(handDetectionInterval);
+        }
+
+        function sendAudioToServer(audioBlob) {
+            const reader = new FileReader();
+            reader.readAsDataURL(audioBlob);
+            reader.onloadend = function() {
+                const base64Audio = reader.result;
+                socket.emit('submit_audio', { audio: base64Audio });
+            }
+        }
+
+        function showLoadingBar() {
+            document.getElementById('loadingBar').style.display = 'block';
+            document.getElementById('loadingProgress').style.width = '0%';
+            document.getElementById('loadingProgress').textContent = '0%';
+        }
+
+        function updateLoadingBar(progress) {
+            document.getElementById('loadingProgress').style.width = progress + '%';
+            document.getElementById('loadingProgress').textContent = progress + '%';
+        }
+
+        function parseEvaluation(evaluationText) {
+            const lines = evaluationText.split('\n');
+            let result = {
+                score: '',
+                review: '',
+                improvement: ''
+            };
+
+            for (let line of lines) {
+                if (line.startsWith('Score:')) {
+                    result.score = line.split(':')[1].trim();
+                } else if (line.startsWith('Review:')) {
+                    result.review = line.split(':')[1].trim();
+                } else if (line.startsWith('Improvement:')) {
+                    result.improvement = line.split(':')[1].trim();
+                }
+            }
+
+            return result;
+        }
+
+        socket.on('progress_update', data => {
+            updateLoadingBar(data.progress);
+        });
+
+        socket.on('evaluation_result', data => {
+            document.getElementById('loadingBar').style.display = 'none';
+            if (data.error) {
+                alert('Error: ' + data.error);
+            } else {
+                document.getElementById('transcription').innerHTML = `<h3>Your Answer:</h3><p>${data.transcription}</p>`;
+                
+                const evaluation = parseEvaluation(data.evaluation);
+                document.getElementById('evaluation').innerHTML = `
+                    <h3>AI Evaluation:</h3>
+                    <div class="score"><span class="label">Score:</span> ${evaluation.score}</div>
+                    <div class="review"><span class="label">Review:</span> ${evaluation.review}</div>
+                    <div class="improvement"><span class="label">Improvement:</span> ${evaluation.improvement}</div>
+                `;
+            }
+        });
+
+        socket.on('hands_detection', data => {
+            document.getElementById('handStatus').textContent = `Hands status: ${data.hands_detected ? 'Detected' : 'Not detected'}`;
+        });
+
+        socket.on('stop_recording', data => {
+            stopRecording();
+            alert(data.reason);
+        });
+
+        socket.on('recording_started', () => {
+            console.log('Recording started');
+        });
+
+        socket.on('recording_stopped', () => {
+            stopRecording();
+        });
+    </script>
+</body>
+</html>

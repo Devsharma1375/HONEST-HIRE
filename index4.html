@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Honest Hire AI Interview Platform</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Roboto:wght@300;400&display=swap');
+
+        body {
+            font-family: 'Roboto', sans-serif;
+            background-color: #0c0c1d;
+            color: #e0e0ff;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-image: 
+                radial-gradient(circle at 10% 20%, rgba(91, 73, 255, 0.1) 0%, transparent 50%),
+                radial-gradient(circle at 90% 80%, rgba(255, 73, 122, 0.1) 0%, transparent 50%);
+        }
+
+        h1 {
+            font-family: 'Orbitron', sans-serif;
+            color: #5bfaff;
+            text-align: center;
+            font-size: 2.5em;
+            text-shadow: 0 0 10px rgba(91, 250, 255, 0.5);
+        }
+
+        #question, #transcription, #evaluation {
+            background-color: rgba(255, 255, 255, 0.05);
+            border: 1px solid #5bfaff;
+            border-radius: 10px;
+            padding: 15px;
+            margin-top: 20px;
+            box-shadow: 0 0 20px rgba(91, 250, 255, 0.2);
+        }
+
+        button {
+            font-family: 'Orbitron', sans-serif;
+            background-color: #5bfaff;
+            color: #0c0c1d;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            margin-top: 15px;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            font-weight: bold;
+        }
+
+        button:hover {
+            background-color: #ff49c7;
+            box-shadow: 0 0 15px rgba(255, 73, 199, 0.5);
+        }
+
+        #stopButton {
+            background-color: #ff49c7;
+            color: #e0e0ff;
+        }
+
+        #stopButton:hover {
+            background-color: #5bfaff;
+            color: #0c0c1d;
+        }
+
+        #loadingBar {
+            width: 100%;
+            background-color: rgba(255, 255, 255, 0.1);
+            border-radius: 25px;
+            overflow: hidden;
+            display: none;
+            margin-top: 20px;
+        }
+
+        #loadingProgress {
+            width: 0%;
+            height: 30px;
+            background: linear-gradient(90deg, #5bfaff, #ff49c7);
+            text-align: center;
+            line-height: 30px;
+            color: #0c0c1d;
+            transition: width 0.5s ease-in-out;
+            font-family: 'Orbitron', sans-serif;
+            font-weight: bold;
+            text-shadow: 0 0 5px rgba(255, 255, 255, 0.5);
+        }
+
+        input[type="file"] {
+            border: 1px solid #5bfaff;
+            padding: 10px;
+            border-radius: 5px;
+            background-color: rgba(255, 255, 255, 0.05);
+            color: #e0e0ff;
+            margin-bottom: 10px;
+        }
+
+        input[type="file"]::file-selector-button {
+            font-family: 'Orbitron', sans-serif;
+            background-color: #5bfaff;
+            color: #0c0c1d;
+            padding: 8px 16px;
+            border: none;
+            border-radius: 20px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        input[type="file"]::file-selector-button:hover {
+            background-color: #ff49c7;
+        }
+
+        .glow {
+            animation: glow 1.5s ease-in-out infinite alternate;
+        }
+
+        @keyframes glow {
+            from {
+                text-shadow: 0 0 5px #5bfaff, 0 0 10px #5bfaff, 0 0 15px #5bfaff;
+            }
+            to {
+                text-shadow: 0 0 10px #ff49c7, 0 0 20px #ff49c7, 0 0 30px #ff49c7;
+            }
+        }
+
+        #evaluation h3 {
+            color: #5bfaff;
+            font-family: 'Orbitron', sans-serif;
+            margin-bottom: 15px;
+        }
+
+        #evaluation .score {
+            font-size: 1.2em;
+            font-weight: bold;
+            color: #ff49c7;
+            margin-bottom: 10px;
+        }
+
+        #evaluation .review, #evaluation .improvement {
+            margin-bottom: 10px;
+        }
+
+        #evaluation .label {
+            font-weight: bold;
+            color: #5bfaff;
+        }
+
+        #videoFeed {
+            width: 100%;
+            max-width: 640px;
+            margin: 20px auto;
+            display: block;
+        }
+
+        #handStatus {
+            text-align: center;
+            margin-top: 10px;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <h1 class="glow">Honest Hire AI Interview Platform</h1>
+    <input type="file" id="resumeUpload" accept=".pdf">
+    <button onclick="uploadResume()">Upload Resume</button>
+    <div id="question"></div>
+    <video id="videoFeed" autoplay muted></video>
+    <div id="handStatus">Hands status: Not detected</div>
+    <button id="stopButton" style="display: none;" onclick="stopRecording()">Stop Recording</button>
+    <div id="loadingBar">
+        <div id="loadingProgress">0%</div>
+    </div>
+    <div id="transcription"></div>
+    <div id="evaluation"></div>
+
+    <script>
+        const socket = io();
+        let mediaRecorder;
+        let audioChunks = [];
+        let isRecording = false;
+        let handDetectionInterval;
+
+        // Set up video feed
+        const video = document.getElementById('videoFeed');
+        navigator.mediaDevices.getUserMedia({ video: true })
+            .then(stream => {
+                video.srcObject = stream;
+            })
+            .catch(err => {
+                console.error("Error accessing the camera:", err);
+            });
+
+        function uploadResume() {
+            const file = document.getElementById('resumeUpload').files[0];
+            if (file) {
+                const formData = new FormData();
+                formData.append('resume', file);
+                fetch('/upload_resume', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        document.getElementById('question').innerHTML = `<h3>AI Generated Question:</h3><p>${data.question}</p>`;
+                        setTimeout(startRecording, 5000);  // Start recording after 5 seconds
+                    } else {
+                        alert('Error: ' + data.error);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('An error occurred. Please try again.');
+                });
+            } else {
+                alert('Please select a PDF file first.');
+            }
+        }
+
+        function startRecording() {
+            navigator.mediaDevices.getUserMedia({ audio: true })
+                .then(stream => {
+                    mediaRecorder = new MediaRecorder(stream);
+                    mediaRecorder.start();
+                    isRecording = true;
+                    document.getElementById('stopButton').style.display = 'block';
+
+                    mediaRecorder.addEventListener("dataavailable", event => {
+                        audioChunks.push(event.data);
+                    });
+
+                    mediaRecorder.addEventListener("stop", () => {
+                        const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                        sendAudioToServer(audioBlob);
+                    });
+
+                    socket.emit('start_recording');
+                    startHandDetection();
+
+                    // Automatically stop recording after 1 minute
+                    setTimeout(stopRecording, 60000);
+                });
+        }
+
+        function stopRecording() {
+            if (isRecording) {
+                mediaRecorder.stop();
+                isRecording = false;
+                document.getElementById('stopButton').style.display = 'none';
+                showLoadingBar();
+                stopHandDetection();
+            }
+        }
+
+        function startHandDetection() {
+            handDetectionInterval = setInterval(() => {
+                const canvas = document.createElement('canvas');
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                canvas.getContext('2d').drawImage(video, 0, 0);
+                canvas.toBlob(blob => {
+                    const reader = new FileReader();
+                    reader.onloadend = () => {
+                        socket.emit('process_frame', { image: reader.result });
+                    };
+                    reader.readAsDataURL(blob);
+                }, 'image/jpeg');
+            }, 1000);  // Send frame every second
+        }
+
+        function stopHandDetection() {
+            clearInterval(handDetectionInterval);
+        }
+
+        function sendAudioToServer(audioBlob) {
+            const reader = new FileReader();
+            reader.readAsDataURL(audioBlob);
+            reader.onloadend = function() {
+                const base64Audio = reader.result;
+                socket.emit('submit_audio', { audio: base64Audio });
+            }
+        }
+
+        function showLoadingBar() {
+            document.getElementById('loadingBar').style.display = 'block';
+            document.getElementById('loadingProgress').style.width = '0%';
+            document.getElementById('loadingProgress').textContent = '0%';
+        }
+
+        function updateLoadingBar(progress) {
+            document.getElementById('loadingProgress').style.width = progress + '%';
+            document.getElementById('loadingProgress').textContent = progress + '%';
+        }
+
+        function parseEvaluation(evaluationText) {
+            const lines = evaluationText.split('\n');
+            let result = {
+                score: '',
+                review: '',
+                improvement: ''
+            };
+
+            for (let line of lines) {
+                if (line.startsWith('Score:')) {
+                    result.score = line.split(':')[1].trim();
+                } else if (line.startsWith('Review:')) {
+                    result.review = line.split(':')[1].trim();
+                } else if (line.startsWith('Improvement:')) {
+                    result.improvement = line.split(':')[1].trim();
+                }
+            }
+
+            return result;
+        }
+
+        socket.on('progress_update', data => {
+            updateLoadingBar(data.progress);
+        });
+
+        socket.on('evaluation_result', data => {
+            document.getElementById('loadingBar').style.display = 'none';
+            if (data.error) {
+                alert('Error: ' + data.error);
+            } else {
+                document.getElementById('transcription').innerHTML = `<h3>Your Answer:</h3><p>${data.transcription}</p>`;
+                
+                const evaluation = parseEvaluation(data.evaluation);
+                document.getElementById('evaluation').innerHTML = `
+                    <h3>AI Evaluation:</h3>
+                    <div class="score"><span class="label">Score:</span> ${evaluation.score}</div>
+                    <div class="review"><span class="label">Review:</span> ${evaluation.review}</div>
+                    <div class="improvement"><span class="label">Improvement:</span> ${evaluation.improvement}</div>
+                `;
+            }
+        });
+
+        socket.on('hands_detection', data => {
+            document.getElementById('handStatus').textContent = `Hands status: ${data.hands_detected ? 'Detected' : 'Not detected'}`;
+        });
+
+        socket.on('stop_recording', data => {
+            stopRecording();
+            alert(data.reason);
+        });
+
+        socket.on('recording_started', () => {
+            console.log('Recording started');
+        });
+
+        socket.on('recording_stopped', () => {
+            stopRecording();
+        });
+    </script>
+</body>
+</html>
